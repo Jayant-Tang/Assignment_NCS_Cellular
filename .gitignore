@@ -1,6 +1,8 @@
 # editors
 *.swp
 *~
+.vscode/
 
 # build
 /build*/
+/debug*/
