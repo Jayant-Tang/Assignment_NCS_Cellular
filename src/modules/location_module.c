@@ -460,12 +460,14 @@ void location_event_handler(const struct location_event_data *event_data)
 		break;
 	}
 
+#if defined(CONFIG_LOCATION_METHOD_CELLULAR_EXTERNAL)
 	case LOCATION_EVT_CELLULAR_EXT_REQUEST:
 		LOG_DBG("Getting cellular request");
 		send_neighbor_cell_update(
 			(struct lte_lc_cells_info *)&event_data->cellular_request);
 		location_cellular_ext_result_set(LOCATION_CELLULAR_EXT_RESULT_UNKNOWN, NULL);
 		break;
+#endif
 
 	default:
 		LOG_DBG("Getting location: Unknown event %d", event_data->id);
