@@ -1,0 +1,10 @@
+description: Voltage Sensor
+
+include: [sensor-device.yaml]
+
+compatible: "jayant,voltage-sensor"
+
+properties:
+    io-channels:
+      required: true
+      description: ADC channel for VDD sensor

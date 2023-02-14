@@ -41,4 +41,26 @@
 			label = "Green LED 4";
 		};
 	};
+
+    my-voltage-sensor {
+        compatible = "jayant,voltage-sensor";
+        io-channels = <&adc 0>;
+        io-channel-names = "vdd";
+    };
 };
+
+&adc {
+	#address-cells = <1>;
+	#size-cells = <0>;
+    status = "okay";
+
+	channel@0 {
+		reg = <0>;
+		zephyr,gain = "ADC_GAIN_1_6"; /* VDD为1.8V，除以6刚好为参考电压一半 */ 
+		zephyr,reference = "ADC_REF_INTERNAL"; /* 内部参考电压为±0.6V */
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,input-positive = <NRF_SAADC_VDD>;
+		zephyr,resolution = <12>;
+	};
+};
+
