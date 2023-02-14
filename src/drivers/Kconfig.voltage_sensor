@@ -1,0 +1,18 @@
+menuconfig JAYANT_VOLTAGE_SENSOR
+	bool "Enable Jayant Voltage Sensor"
+	default n
+
+if JAYANT_VOLTAGE_SENSOR
+
+config JAYANT_VOLTAGE_SENSOR_INIT_PRIORITY
+	int "Jayant Voltage Sensor init priority"
+	default KERNEL_INIT_PRIORITY_DEVICE
+	help
+	  ADC driver device initialization priority.
+
+module = JAYANT_VOLTAGE_SENSOR
+module-str = Jayant Voltage Sensor
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # JAYANT_VOLTAGE_SENSOR
+
