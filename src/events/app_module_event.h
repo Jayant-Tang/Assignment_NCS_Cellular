@@ -53,6 +53,12 @@ enum app_module_event_type {
 	 */
 	APP_EVT_SHUTDOWN_READY,
 
+    /**
+     * VDD测量相关事件
+     */
+    APP_EVT_BATTERY_DATA_READY,
+    APP_EVT_BATTERY_DATA_NOT_READY,
+
 	/** An irrecoverable error has occurred in the application module. Error details are
 	 *  attached in the event structure.
 	 */
@@ -73,6 +79,11 @@ enum app_module_data_type {
 	APP_DATA_COUNT,
 };
 
+struct app_module_bat_data {
+    uint16_t vdd_mv;
+    int64_t timestamp;
+};
+
 /** @brief Application module event. */
 struct app_module_event {
 	struct app_event_header header;
@@ -84,6 +95,10 @@ struct app_module_event {
 		int err;
 		/* Module ID, used when acknowledging shutdown requests. */
 		uint32_t id;
+        /**
+         * VDD 电压，单位mV
+         */
+       struct app_module_bat_data bat;
 	} data;
 
 	size_t count;

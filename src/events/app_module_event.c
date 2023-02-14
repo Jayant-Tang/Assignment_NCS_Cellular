@@ -46,6 +46,10 @@ static char *get_evt_type_str(enum app_module_event_type type)
 		return "APP_EVT_LTE_DISCONNECT";
 	case APP_EVT_SHUTDOWN_READY:
 		return "APP_EVT_SHUTDOWN_READY";
+    case APP_EVT_BATTERY_DATA_READY:
+        return "APP_EVT_BATTERY_DATA_READY";
+    case APP_EVT_BATTERY_DATA_NOT_READY:
+        return "APP_EVT_BATTERY_DATA_NOT_READY";
 	case APP_EVT_ERROR:
 		return "APP_EVT_ERROR";
 	default:

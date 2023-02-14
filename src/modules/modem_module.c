@@ -724,31 +724,31 @@ static bool data_type_is_requested(enum app_module_data_type *data_list,
 	return false;
 }
 
-static int battery_data_get(void)
-{
-	int err;
+// static int battery_data_get(void)
+// {
+// 	int err;
 
-	/* Replace this function with a function that specifically
-	 * requests battery.
-	 */
-	err = modem_info_params_get(&modem_param);
-	if (err) {
-		LOG_ERR("modem_info_params_get, error: %d", err);
-		return err;
-	}
+// 	/* Replace this function with a function that specifically
+// 	 * requests battery.
+// 	 */
+// 	err = modem_info_params_get(&modem_param);
+// 	if (err) {
+// 		LOG_ERR("modem_info_params_get, error: %d", err);
+// 		return err;
+// 	}
 
-	struct modem_module_event *modem_module_event = new_modem_module_event();
+// 	struct modem_module_event *modem_module_event = new_modem_module_event();
 
-	__ASSERT(modem_module_event, "Not enough heap left to allocate event");
+// 	__ASSERT(modem_module_event, "Not enough heap left to allocate event");
 
-	modem_module_event->data.bat.battery_voltage = modem_param.device.battery.value;
-	modem_module_event->data.bat.timestamp = k_uptime_get();
-	modem_module_event->type = MODEM_EVT_BATTERY_DATA_READY;
+// 	modem_module_event->data.bat.battery_voltage = modem_param.device.battery.value;
+// 	modem_module_event->data.bat.timestamp = k_uptime_get();
+// 	modem_module_event->type = MODEM_EVT_BATTERY_DATA_READY;
 
-	APP_EVENT_SUBMIT(modem_module_event);
+// 	APP_EVENT_SUBMIT(modem_module_event);
 
-	return 0;
-}
+// 	return 0;
+// }
 
 static int configure_low_power(void)
 {
@@ -1001,18 +1001,18 @@ static void on_all_states(struct modem_msg_data *msg)
 			}
 		}
 
-		if (data_type_is_requested(msg->module.app.data_list,
-					   msg->module.app.count,
-					   APP_DATA_BATTERY)) {
+	// 	if (data_type_is_requested(msg->module.app.data_list,
+	// 				   msg->module.app.count,
+	// 				   APP_DATA_BATTERY)) {
 
-			int err;
+	// 		int err;
 
-			err = battery_data_get();
-			if (err) {
-				SEND_EVENT(modem,
-					MODEM_EVT_BATTERY_DATA_NOT_READY);
-			}
-		}
+	// 		err = battery_data_get();
+	// 		if (err) {
+	// 			SEND_EVENT(modem,
+	// 				MODEM_EVT_BATTERY_DATA_NOT_READY);
+	// 		}
+	// 	}
 	}
 
 	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {

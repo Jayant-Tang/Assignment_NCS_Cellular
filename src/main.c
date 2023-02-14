@@ -33,6 +33,16 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/logging/log_ctrl.h>
 
+#include "voltage-sensor.h"
+
+// 判断电压表device tree node是否存在
+#if !DT_NODE_EXISTS(DT_PATH(my_voltage_sensor))|| \
+    !DT_NODE_HAS_PROP(DT_PATH(my_voltage_sensor), io_channels)
+#error "vdd sensor does not exist!"
+#endif
+
+const struct device *voltage_sensor = DEVICE_DT_GET(DT_PATH(my_voltage_sensor));
+
 LOG_MODULE_REGISTER(MODULE, CONFIG_APPLICATION_MODULE_LOG_LEVEL);
 
 /* Message structure. Events from other modules are converted to messages
@@ -506,6 +516,27 @@ static void on_all_events(struct app_msg_data *msg)
 		sample_request_ongoing = true;
 	}
 
+    if (IS_EVENT(msg, app, APP_EVT_DATA_GET)) {
+		for (int i = 0; i < msg->module.app.count; i++){
+            if (APP_DATA_BATTERY == msg->module.app.data_list[i]) {
+                
+                const struct voltage_sensor_api *api = (const struct voltage_sensor_api*)voltage_sensor->api;
+                int32_t volt_vdd = api->voltage_get();
+                
+                if (-1 == volt_vdd) {
+                    SEND_EVENT(app, APP_EVT_BATTERY_DATA_NOT_READY);
+                } else {
+                    struct app_module_event *evt = new_app_module_event();
+                    __ASSERT(evt, "Not enough heap left to allocate event");
+                    evt->type = APP_EVT_BATTERY_DATA_READY;
+                    evt->data.bat.vdd_mv = volt_vdd;
+                    evt->data.bat.timestamp = k_uptime_get();
+                    APP_EVENT_SUBMIT(evt);
+                }
+            }
+        }
+	}
+
 	if (IS_EVENT(msg, data, DATA_EVT_DATA_READY)) {
 		sample_request_ongoing = false;
 	}
@@ -519,7 +550,6 @@ void main(void)
 {
 	int err;
 	struct app_msg_data msg = { 0 };
-
 	if (!IS_ENABLED(CONFIG_LWM2M_CARRIER)) {
 		handle_nrf_modem_lib_init_ret();
 	}
