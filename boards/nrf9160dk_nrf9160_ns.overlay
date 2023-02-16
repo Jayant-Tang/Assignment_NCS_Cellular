@@ -12,15 +12,21 @@
 		};
 	};
 
-	leds1 {
-		compatible = "gpio-leds";
-		status = "okay";
-		label = "LED1";
-		led1: led_1 {
-			gpios = <&gpio0 3 0>;
-			label = "Green LED 2";
-		};
-	};
+    // 删除CAF使用的led1节点 （板子上的LED2）
+	// leds1 {
+	// 	compatible = "gpio-leds";
+	// 	status = "okay";
+	// 	label = "LED1";
+	// 	led1: led_1 {
+	// 		gpios = <&gpio0 3 0>;
+	// 		label = "Green LED 2";
+	// 	};
+	// };
+
+    // aliases中删除对led的引用
+    aliases {
+        /delete-property/ led1;
+    };
 
 	leds2 {
 		compatible = "gpio-leds";

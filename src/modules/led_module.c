@@ -39,10 +39,10 @@ static void update_led(enum led_state state)
 		led_bm |= BIT(LED_ID_CONNECTING);
 		break;
 	case LED_STATE_LOCATION_SEARCHING:
-		send_led_event(LED_ID_SEARCHING,
-				&asset_tracker_led_effect[LED_STATE_LOCATION_SEARCHING]);
-		led_bm |= BIT(LED_ID_SEARCHING);
-		break;
+		// send_led_event(LED_ID_SEARCHING,
+		// 		&asset_tracker_led_effect[LED_STATE_LOCATION_SEARCHING]);
+		// led_bm |= BIT(LED_ID_SEARCHING);
+		// break;
 	case LED_STATE_CLOUD_PUBLISHING:
 		send_led_event(LED_ID_PUBLISHING,
 				&asset_tracker_led_effect[LED_STATE_CLOUD_PUBLISHING]);
@@ -85,16 +85,18 @@ static void update_led(enum led_state state)
 	case LED_STATE_FOTA_UPDATING:
 		send_led_event(LED_ID_FOTA_1,
 			       &asset_tracker_led_effect[LED_STATE_FOTA_UPDATING]);
-		send_led_event(LED_ID_FOTA_2,
-			       &asset_tracker_led_effect[LED_STATE_FOTA_UPDATING]);
-		led_bm |= (BIT(LED_ID_FOTA_1) | BIT(LED_ID_FOTA_2));
+		// send_led_event(LED_ID_FOTA_2,
+		// 	       &asset_tracker_led_effect[LED_STATE_FOTA_UPDATING]);
+		// led_bm |= (BIT(LED_ID_FOTA_1) | BIT(LED_ID_FOTA_2));
+        led_bm |= BIT(LED_ID_FOTA_1);
 		break;
 	case LED_STATE_FOTA_UPDATE_REBOOT:
 		send_led_event(LED_ID_FOTA_1,
 			       &asset_tracker_led_effect[LED_STATE_FOTA_UPDATE_REBOOT]);
-		send_led_event(LED_ID_FOTA_2,
-			       &asset_tracker_led_effect[LED_STATE_FOTA_UPDATE_REBOOT]);
-		led_bm |= (BIT(LED_ID_FOTA_1) | BIT(LED_ID_FOTA_2));
+		// send_led_event(LED_ID_FOTA_2,
+		// 	       &asset_tracker_led_effect[LED_STATE_FOTA_UPDATE_REBOOT]);
+		// led_bm |= (BIT(LED_ID_FOTA_1) | BIT(LED_ID_FOTA_2));
+        led_bm |= BIT(LED_ID_FOTA_1);
 		break;
 	case LED_STATE_TURN_OFF:
 		/* Do nothing. */
