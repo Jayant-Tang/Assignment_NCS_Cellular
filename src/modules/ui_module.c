@@ -23,6 +23,9 @@
 #include "events/cloud_module_event.h"
 #include "events/led_state_event.h"
 
+#include <blink-led.h>
+const struct device *jayant_blink_led = DEVICE_DT_GET(DT_PATH(blink_leds));
+
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(MODULE, CONFIG_UI_MODULE_LOG_LEVEL);
 
@@ -484,6 +487,9 @@ static void on_state_cloud_connecting(struct ui_msg_data *msg)
 		transition_list_append(LED_STATE_TURN_OFF, HOLD_FOREVER);
 		k_work_reschedule(&led_pattern_update_work, K_NO_WAIT);
 		state_set(STATE_RUNNING);
+
+        const struct blink_led_api *api = (struct blink_led_api *)(jayant_blink_led->api);
+        api->start(jayant_blink_led, 0);
 	}
 
 	if (IS_EVENT(msg, cloud, CLOUD_EVT_USER_ASSOCIATED)) {
@@ -532,6 +538,12 @@ static void on_all_states(struct ui_msg_data *msg)
 		transition_list_append(LED_STATE_CLOUD_CONNECTING, HOLD_FOREVER);
 		k_work_reschedule(&led_pattern_update_work, K_NO_WAIT);
 		state_set(STATE_CLOUD_CONNECTING);
+	}
+
+    
+	if (IS_EVENT(msg, cloud, CLOUD_EVT_DISCONNECTED)) {
+        const struct blink_led_api *api = (struct blink_led_api *)(jayant_blink_led->api);
+        api->stop(jayant_blink_led, 0);
 	}
 
 	if (IS_EVENT(msg, util, UTIL_EVT_SHUTDOWN_REQUEST)) {
