@@ -53,6 +53,22 @@
         io-channels = <&adc 0>;
         io-channel-names = "vdd";
     };
+
+    blink-leds {  		
+        compatible = "jayant,led-blink";
+        ppi-controller = <&dppic>;
+        timer = <&timer0>;
+        blink-period = < 1000 >; // ms
+        status = "okay";
+        blink-led2 {
+            my-gpios = <&gpio0 3 0>;
+            label = "BLINK LED2";
+        };
+    };
+};
+
+&timer0 {
+    status = "okay";
 };
 
 &adc {

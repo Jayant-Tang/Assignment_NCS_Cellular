@@ -1,0 +1,61 @@
+include: [base.yaml]
+
+description: |
+  Blink LED with timer and Nordic nRF PPI or DPPI
+
+  Example:
+  /{
+      blink-leds {  		
+          compatible = "jayant,led-blink";
+          ppi-controller = <&dppic>;
+          timer = <&timer0>;
+          blink-period = < 1000 >; // ms
+          status = "okay";
+          blink-led1 {
+              gpiotes = <&gpiote 0>; // <port pin>
+              label = "Timer PPI Blink LED1";
+          };
+          blink-led2 {
+              gpiotes = <&gpiote 1>; // <port pin>
+              label = "Timer PPI Blink LED2";
+          };
+      };
+  };
+
+compatible: "jayant,led-blink"
+
+properties:
+  ppi-controller: 
+    required: true
+    type: phandle
+    description: ppi or dppi controller used for led blink
+
+  timer:
+    required: true
+    type: phandle
+    description: timer used for a single LED
+
+  blink-period:
+    required: true
+    type: int
+    description: led on and off time in millisecond  
+  
+child-binding:
+  description: |
+    Blink LED child Node. 
+    The number of child nodes must not be greater than the number of timer channels
+  properties: 
+    my-gpios:
+      type: phandle-array
+      required: true
+      description: GPIO used for blink LED
+    label:
+      type: string
+      description: Descriptive name of the blink LED
+
+  
+
+      
+    
+
+    
