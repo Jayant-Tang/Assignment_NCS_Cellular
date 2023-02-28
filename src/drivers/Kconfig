@@ -16,3 +16,17 @@ source "subsys/logging/Kconfig.template.log_config"
 
 endif # JAYANT_VOLTAGE_SENSOR
 
+
+menuconfig JAYANT_BLINK_LED
+	bool "Enable Jayant Blink LED"
+	default n
+
+if JAYANT_BLINK_LED
+
+config JAYANT_BLINK_LED_PRIORITY
+	int "Jayant Blink LED init priority"
+	default KERNEL_INIT_PRIORITY_DEVICE
+	help
+	  Must be initialized after gpio and counter
+endif # JAYANT_BLINK_LED
+

@@ -1,2 +1,4 @@
-target_include_directories(app PRIVATE .)
-target_sources_ifdef(CONFIG_JAYANT_VOLTAGE_SENSOR app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/voltage-sensor.c)
+zephyr_include_directories(.)
+zephyr_library()
+zephyr_library_sources_ifdef(CONFIG_JAYANT_VOLTAGE_SENSOR  voltage-sensor.c)
+zephyr_library_sources_ifdef(CONFIG_JAYANT_BLINK_LED       blink-led.c)

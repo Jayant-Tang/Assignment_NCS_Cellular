@@ -43,7 +43,7 @@ rsource "src/cloud/cloud_codec/Kconfig"
 rsource "src/watchdog/Kconfig"
 rsource "src/events/Kconfig"
 
-rsource "src/drivers/Kconfig.voltage_sensor"
+rsource "src/drivers/Kconfig"
 
 endmenu
 

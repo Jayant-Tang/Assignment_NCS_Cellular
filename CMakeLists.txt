@@ -4,6 +4,10 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
+list(APPEND ZEPHYR_EXTRA_MODULES
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/drivers
+    )
+
 cmake_minimum_required(VERSION 3.20.0)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
@@ -21,7 +25,7 @@ zephyr_include_directories_ifdef(CONFIG_MEMFAULT configuration/memfault)
 # Application directories
 add_subdirectory(src/modules)
 add_subdirectory(src/events)
-add_subdirectory(src/drivers)
+# add_subdirectory(src/drivers)
 
 add_subdirectory_ifdef(CONFIG_CLOUD_MODULE src/cloud)
 add_subdirectory_ifdef(CONFIG_SENSOR_MODULE src/ext_sensors)

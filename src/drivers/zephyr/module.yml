@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2019 Nordic Semiconductor
+name: my-driver
+
+build:
+  cmake: zephyr/..
+  kconfig: zephyr/../Kconfig
+
+  
