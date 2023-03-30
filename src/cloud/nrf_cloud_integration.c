@@ -224,6 +224,12 @@ static void nrf_cloud_event_handler(const struct nrf_cloud_evt *evt)
 		break;
 	case NRF_CLOUD_EVT_RX_DATA_GENERAL:
 		LOG_DBG("NRF_CLOUD_EVT_RX_DATA_GENERAL");
+        LOG_INF("Received data from topic: %.*s", evt->topic.len, evt->topic.ptr);
+        cloud_wrap_evt.type = CLOUD_WRAP_EVT_CUSTOM_DATA_RECEIVED;
+        cloud_wrap_evt.data.buf = (char *)evt->data.ptr;
+        cloud_wrap_evt.data.len = evt->data.len;
+		notify = true;
+
 		break;
 	case NRF_CLOUD_EVT_RX_DATA_SHADOW:
 		LOG_DBG("NRF_CLOUD_EVT_RX_DATA_SHADOW");

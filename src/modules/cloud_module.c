@@ -434,6 +434,11 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 		SEND_ERROR(cloud, CLOUD_EVT_ERROR, evt->err);
 		break;
 	}
+    case CLOUD_WRAP_EVT_CUSTOM_DATA_RECEIVED: {
+        LOG_INF("CLOUD_WRAP_EVT_CUSTOM_DATA_RECEIVED: \n %.*s", 
+                evt->data.len, evt->data.buf);
+        break;
+    }
 	default:
 		break;
 

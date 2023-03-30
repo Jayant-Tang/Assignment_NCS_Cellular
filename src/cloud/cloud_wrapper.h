@@ -34,8 +34,15 @@ enum cloud_wrap_event_type {
 	CLOUD_WRAP_EVT_DISCONNECTED,
 	/** Data received from cloud integration layer.
 	 *  Payload is of type @ref cloud_wrap_event_data.
+     * @note 它只接收了ControlChannel（也就是device shadow topic的数据）
+     *       未接收DataChannel（也就是message topic的数据）
 	 */
 	CLOUD_WRAP_EVT_DATA_RECEIVED,
+
+    /** 新增自定义数据的接收事件
+     */
+    CLOUD_WRAP_EVT_CUSTOM_DATA_RECEIVED,
+
 	/** User association request received from cloud. */
 	CLOUD_WRAP_EVT_USER_ASSOCIATION_REQUEST,
 	/** User association completed. */
