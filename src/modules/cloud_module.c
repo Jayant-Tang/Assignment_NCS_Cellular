@@ -102,7 +102,7 @@ const k_tid_t cloud_module_thread;
 
 /* Register message IDs that are used with the QoS library. */
 QOS_MESSAGE_TYPES_REGISTER(GENERIC, BATCH, UI, NEIGHBOR_CELLS, AGPS_REQUEST,
-			   PGPS_REQUEST, CONFIG, MEMFAULT);
+			   PGPS_REQUEST, CONFIG, MEMFAULT, CUSTOM_CMD);
 
 /* Cloud module message queue. */
 #define CLOUD_QUEUE_ENTRY_COUNT		20
@@ -435,8 +435,25 @@ static void cloud_wrap_event_handler(const struct cloud_wrap_event *const evt)
 		break;
 	}
     case CLOUD_WRAP_EVT_CUSTOM_DATA_RECEIVED: {
-        LOG_INF("CLOUD_WRAP_EVT_CUSTOM_DATA_RECEIVED: \n %.*s", 
-                evt->data.len, evt->data.buf);
+        LOG_HEXDUMP_INF(evt->data.buf, evt->data.len, "CLOUD_WRAP_EVT_CUSTOM_DATA_RECEIVED: ");
+
+        struct cloud_module_event *cloud_evt = new_cloud_module_event(); 
+        __ASSERT(cloud_evt, "Not enough heap left to allocate event");
+
+        // 当前函数是一个回调函数，在nrf cloud library内部被调用，
+        // evt在 nct_mqtt_evt_handler 中是局部变量。当它返回时，evt会被释放，所以这里需要复制一份
+        cloud_evt->data.custom_cmd.ptr = k_malloc(evt->data.len);
+        if (NULL == cloud_evt->data.custom_cmd.ptr) {
+            LOG_WRN("k_malloc failed");
+            return;
+        }
+        memcpy(cloud_evt->data.custom_cmd.ptr, evt->data.buf, evt->data.len);
+        cloud_evt->data.custom_cmd.len = evt->data.len;
+        cloud_evt->data.custom_cmd.is_allocated = true; // 用于指示此内存是需要释放的
+
+        cloud_evt->type = CLOUD_EVT_CUSTOM_CMD;
+        APP_EVENT_SUBMIT(cloud_evt);
+
         break;
     }
 	default:
@@ -621,6 +638,18 @@ static void on_state_init(struct cloud_msg_data *msg)
 		err = setup();
 		__ASSERT(err == 0, "setp() failed");
 	}
+}
+
+/* Message handler for custom cloud command */
+static void on_custom_cloud_data_ready(struct cloud_msg_data *msg)
+{
+    struct app_module_custom_cloud_cmd_data *cmd = &(msg->module.app.data.custom_cmd);
+    static uint8_t none[2] = { 0x00, 0x00 };
+    if(!(cmd->buf)) {
+        add_qos_message(none, sizeof(none), CUSTOM_CMD, QOS_FLAG_RELIABILITY_ACK_REQUIRED, false);
+    } else {
+        add_qos_message(cmd->buf, cmd->len, CUSTOM_CMD, QOS_FLAG_RELIABILITY_ACK_REQUIRED, cmd->is_allocated);
+    }
 }
 
 /* Message handler for STATE_LTE_CONNECTED. */
@@ -817,6 +846,10 @@ static void on_sub_state_cloud_connected(struct cloud_msg_data *msg)
 				true);
 	}
 
+    if (IS_EVENT(msg, app, APP_EVT_CUSTOM_CLOUD_CMD_READY)) {
+        on_custom_cloud_data_ready(msg);
+    }
+
 	if (IS_EVENT(msg, cloud, CLOUD_EVT_DATA_SEND_QOS)) {
 
 		if (IS_ENABLED(CONFIG_LWM2M_INTEGRATION)) {
@@ -905,6 +938,15 @@ static void on_sub_state_cloud_connected(struct cloud_msg_data *msg)
 				LOG_WRN("cloud_wrap_memfault_data_send, err: %d", err);
 			}
 			break;
+        case CUSTOM_CMD:
+            err = cloud_wrap_custom_cmd_send(message->buf,
+                                             message->len,
+                                             ack,
+                                             msg->module.cloud.data.message.id);
+            if (err) {
+                LOG_WRN("cloud_wrap_custom_cmd_send, err: %d", err);
+            }
+            break;
 		default:
 			LOG_ERR("Unknown data type");
 			break;

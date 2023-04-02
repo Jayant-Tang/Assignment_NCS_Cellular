@@ -18,6 +18,10 @@
 #endif /* CONFIG_LWM2M_INTEGRATION */
 #include <net/nrf_cloud.h>
 
+#include <zephyr/drivers/flash.h>
+#include <zephyr/storage/flash_map.h>
+#include <zephyr/fs/nvs.h>
+
 /* Module name is used by the Application Event Manager macros in this file */
 #define MODULE main
 #include <caf/events/module_state_event.h>
@@ -445,6 +449,133 @@ static void on_state_init(struct app_msg_data *msg)
 	}
 }
 
+#define NVS_PARTITION_DEVICE DEVICE_DT_GET(DT_NODELABEL(flash_controller))
+#define NVS_PARTITION_OFFSET PM_MY_NVS_STORAGE_ADDRESS
+#define NVS_PARTITION_SIZE   PM_MY_NVS_STORAGE_SIZE
+
+static struct nvs_fs fs;
+
+void my_nvs_init()
+{
+    int rc = 0;
+	struct flash_pages_info info;
+
+    fs.flash_device = NVS_PARTITION_DEVICE;
+    if(!device_is_ready(fs.flash_device)){
+        LOG_ERR("flash device is not ready!");
+        return;
+    }
+    fs.offset = NVS_PARTITION_OFFSET;
+    rc = flash_get_page_info_by_offs(fs.flash_device, fs.offset, &info);
+    if (rc) {
+		LOG_ERR("Unable to get page info\n");
+		return;
+	}
+    fs.sector_size = info.size;
+    LOG_INF("partition_size = 0x%x, sector_size = 0x%x", NVS_PARTITION_SIZE, fs.sector_size);
+	fs.sector_count = NVS_PARTITION_SIZE / fs.sector_size;
+
+    rc = nvs_mount(&fs);
+    if (rc) {
+		LOG_ERR("Flash init failed\n");
+		return;
+	}
+}
+
+enum custom_cmd_t {
+    FLASH_WRITE = 0x01,
+    FLASH_READ = 0x02,
+    SPIM_WRITE = 0x03,
+    SPIM_READ = 0x04,
+    TWI_WRITE = 0x05,
+    TWI_READ = 0x06,
+};
+
+#define NVS_CUSTOM_CLOUD_DATA_ID 0x01
+
+/* 自定义云端命令处理函数*/
+static void on_cloud_custom_cmd(struct app_msg_data *msg)
+{
+    struct cloud_module_custom_cmd *command = &(msg->module.cloud.data.custom_cmd);
+
+    uint8_t cmd = command->ptr[0];
+    uint8_t len = command->ptr[1];
+    uint8_t *data = command->ptr + 2;
+
+    switch(cmd){
+    case FLASH_WRITE:{
+        if (len == command->len - 2){
+            LOG_HEXDUMP_INF(data, len, "flash write: ");
+            int rc = nvs_write(&fs, NVS_CUSTOM_CLOUD_DATA_ID, data, len);
+            if (rc >= 0){
+                LOG_INF("write flash success!");
+            } else {
+                LOG_INF("write flash failed!, rc=%d", rc);
+            }
+        } else {
+            LOG_WRN("write flash len is not match! paylod_len=%d, len=%d", command->len, len);
+        }
+        
+        if(command->is_allocated){
+            k_free(command->ptr);
+        }
+        break;
+    }
+    
+    case FLASH_READ:{
+        struct app_module_event *evt = new_app_module_event();
+        if (evt == NULL) {
+            LOG_ERR("Failed to allocate memory for event");
+            return;
+        }
+
+        if( len <= 0 ) {
+            LOG_WRN("read flash len is less than 0!");
+            evt->data.custom_cmd.buf = NULL;
+            evt->data.custom_cmd.len = 0;
+            evt->data.custom_cmd.is_allocated = false;
+        } else {
+            uint8_t *buf = k_malloc(len);
+            if ( buf == NULL){
+                LOG_WRN("read flash malloc failed!");
+                return;
+            }
+            int rc = nvs_read(&fs, NVS_CUSTOM_CLOUD_DATA_ID, buf, len);
+            if (rc < 0) {
+                LOG_WRN("read flash failed!, rc = %d", rc);
+                k_free(buf);
+                evt->data.custom_cmd.buf = NULL;
+                evt->data.custom_cmd.len = 0;
+                evt->data.custom_cmd.is_allocated = false;
+            } else {
+                LOG_HEXDUMP_INF(buf, len, "flash read success:");
+                evt->data.custom_cmd.buf = buf;
+                evt->data.custom_cmd.len = len;
+                evt->data.custom_cmd.is_allocated = true;
+            }
+        }
+        evt->type = APP_EVT_CUSTOM_CLOUD_CMD_READY;
+        APP_EVENT_SUBMIT(evt);
+        break;
+    }
+    case SPIM_WRITE:{
+        break;
+    }
+    case SPIM_READ:{
+        break;
+    }
+    case TWI_WRITE:{
+        break;
+    }
+    case TWI_READ:{
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+
 /* Message handler for STATE_RUNNING. */
 static void on_state_running(struct app_msg_data *msg)
 {
@@ -455,6 +586,10 @@ static void on_state_running(struct app_msg_data *msg)
 	if (IS_EVENT(msg, app, APP_EVT_DATA_GET_ALL)) {
 		data_get();
 	}
+
+    if(IS_EVENT(msg, cloud, CLOUD_EVT_CUSTOM_CMD)) {
+        on_cloud_custom_cmd(msg);
+    }
 }
 
 /* Message handler for SUB_STATE_PASSIVE_MODE. */
@@ -567,6 +702,8 @@ void main(void)
 	}
 
 	self.thread_id = k_current_get();
+
+    my_nvs_init();
 
 	err = module_start(&self);
 	if (err) {

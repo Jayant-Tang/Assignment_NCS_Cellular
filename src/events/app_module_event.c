@@ -52,6 +52,8 @@ static char *get_evt_type_str(enum app_module_event_type type)
         return "APP_EVT_BATTERY_DATA_NOT_READY";
 	case APP_EVT_ERROR:
 		return "APP_EVT_ERROR";
+    case APP_EVT_CUSTOM_CLOUD_CMD_READY:
+        return "APP_EVT_CUSTOM_CLOUD_CMD_READY";
 	default:
 		return "Unknown event";
 	}

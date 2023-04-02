@@ -224,7 +224,7 @@ static void nrf_cloud_event_handler(const struct nrf_cloud_evt *evt)
 		break;
 	case NRF_CLOUD_EVT_RX_DATA_GENERAL:
 		LOG_DBG("NRF_CLOUD_EVT_RX_DATA_GENERAL");
-        LOG_INF("Received data from topic: %.*s", evt->topic.len, evt->topic.ptr);
+        LOG_INF("Received data from topic: %.*s", evt->topic.len, (char*)evt->topic.ptr);
         cloud_wrap_evt.type = CLOUD_WRAP_EVT_CUSTOM_DATA_RECEIVED;
         cloud_wrap_evt.data.buf = (char *)evt->data.ptr;
         cloud_wrap_evt.data.len = evt->data.len;
@@ -437,6 +437,25 @@ int cloud_wrap_neighbor_cells_send(char *buf, size_t len, bool ack, uint32_t id)
 	};
 
 	err = nrf_cloud_send(&msg);
+	if (err) {
+		LOG_ERR("nrf_cloud_send, error: %d", err);
+		return err;
+	}
+
+	return 0;
+}
+
+int cloud_wrap_custom_cmd_send(char *buf, size_t len, bool ack, uint32_t id)
+{
+	int err;
+	struct nrf_cloud_tx_data msg = {
+		.data.ptr = buf,
+		.data.len = len,
+		.id = id,
+		.qos = ack ? MQTT_QOS_1_AT_LEAST_ONCE : MQTT_QOS_0_AT_MOST_ONCE,
+		.topic_type = NRF_CLOUD_TOPIC_MESSAGE,
+	};
+    err = nrf_cloud_send(&msg);
 	if (err) {
 		LOG_ERR("nrf_cloud_send, error: %d", err);
 		return err;

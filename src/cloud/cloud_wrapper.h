@@ -210,6 +210,10 @@ int cloud_wrap_ui_send(char *buf, size_t len, bool ack, uint32_t id, char *path_
  */
 int cloud_wrap_neighbor_cells_send(char *buf, size_t len, bool ack, uint32_t id);
 
+
+// 发送自定义命令到云端
+int cloud_wrap_custom_cmd_send(char *buf, size_t len, bool ack, uint32_t id);
+
 /**
  * @brief Send A-GPS request to cloud.
  *

@@ -59,6 +59,11 @@ enum app_module_event_type {
     APP_EVT_BATTERY_DATA_READY,
     APP_EVT_BATTERY_DATA_NOT_READY,
 
+    /**
+     * 自定义云端命令相关事件
+     */
+    APP_EVT_CUSTOM_CLOUD_CMD_READY,
+
 	/** An irrecoverable error has occurred in the application module. Error details are
 	 *  attached in the event structure.
 	 */
@@ -79,9 +84,17 @@ enum app_module_data_type {
 	APP_DATA_COUNT,
 };
 
+// 自定义电压数据消息
 struct app_module_bat_data {
     uint16_t vdd_mv;
     int64_t timestamp;
+};
+
+//自定义云端命令消息
+struct app_module_custom_cloud_cmd_data {
+    uint8_t *buf;
+    size_t len;
+    bool is_allocated;
 };
 
 /** @brief Application module event. */
@@ -95,10 +108,10 @@ struct app_module_event {
 		int err;
 		/* Module ID, used when acknowledging shutdown requests. */
 		uint32_t id;
-        /**
-         * VDD 电压，单位mV
-         */
-       struct app_module_bat_data bat;
+        /**  VDD 电压，单位mV */
+        struct app_module_bat_data bat;
+         /** 自定义云端命令消息 */
+        struct app_module_custom_cloud_cmd_data custom_cmd;
 	} data;
 
 	size_t count;

@@ -96,7 +96,12 @@ enum cloud_module_event_type {
 	/** An irrecoverable error has occurred in the cloud module. Error details are
 	 *  attached in the event structure.
 	 */
-	CLOUD_EVT_ERROR
+	CLOUD_EVT_ERROR,
+
+    /**
+     * @brief A custom command has been received from the cloud.
+     */
+    CLOUD_EVT_CUSTOM_CMD,
 };
 
 /** @brief Structure used to acknowledge messages sent to the cloud module. */
@@ -107,6 +112,16 @@ struct cloud_module_data_ack {
 	size_t len;
 };
 
+/** @brief Structure used to pass custom CMD */
+struct cloud_module_custom_cmd {
+    /** Pointer to data that was attempted to be sent. */
+    uint8_t *ptr;
+    /** Length of data that was attempted to be sent. */
+    size_t len;
+    /** indicate if the data is allocated*/
+    bool is_allocated;
+};
+
 /** @brief Cloud module event. */
 struct cloud_module_event {
 	/** Cloud module application event header. */
@@ -115,6 +130,8 @@ struct cloud_module_event {
 	enum cloud_module_event_type type;
 
 	union {
+        /** Variable that contains a custom command received from the cloud service. */
+        struct cloud_module_custom_cmd custom_cmd;
 		/** Variable that contains a new configuration received from the cloud service. */
 		struct cloud_data_cfg config;
 		/** Variable that contains data that was attempted to be sent. Could be used

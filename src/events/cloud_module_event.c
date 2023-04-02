@@ -46,6 +46,8 @@ static char *get_evt_type_str(enum cloud_module_event_type type)
 		return "CLOUD_EVT_FOTA_ERROR";
 	case CLOUD_EVT_ERROR:
 		return "CLOUD_EVT_ERROR";
+    case CLOUD_EVT_CUSTOM_CMD:
+        return "CLOUD_EVT_CUSTOM_CMD";
 	default:
 		return "Unknown event";
 	}
