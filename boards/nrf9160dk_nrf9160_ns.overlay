@@ -1,5 +1,7 @@
 /	{
+
 	/delete-node/ leds;
+    /delete-node/ pwmleds;
 
 	leds0 {
 		compatible = "gpio-leds";
@@ -26,6 +28,7 @@
     // aliases中删除对led的引用
     aliases {
         /delete-property/ led1;
+        /delete-property/ pwm-led0;
     };
 
 	leds2 {
@@ -67,6 +70,10 @@
     };
 };
 
+&pwm0 {
+    status = "disabled";
+};
+
 &timer0 {
     status = "okay";
 };
@@ -84,5 +91,36 @@
 		zephyr,input-positive = <NRF_SAADC_VDD>;
 		zephyr,resolution = <12>;
 	};
+};
+
+&spi1 {
+    status = "okay";
+    cs-gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+    pinctrl-0 = <&spi1_default>;
+    pinctrl-1 = <&spi1_sleep>;
+    pinctrl-names = "default", "sleep";
+};
+
+&i2c2 {
+    status = "okay";
+};
+
+
+&pinctrl {
+    spi1_default: spi1_default {
+        group1{
+            psels = < NRF_PSEL(SPIM_SCK, 0, 15)>,
+                    < NRF_PSEL(SPIM_MOSI, 0, 16)>,
+                    < NRF_PSEL(SPIM_MISO, 0, 17)>;
+        };
+    };
+    spi1_sleep: spi1_sleep {
+        group1 {
+                psels = <NRF_PSEL(SPIM_SCK, 0, 15)>,
+                        <NRF_PSEL(SPIM_MOSI, 0, 16)>,
+                        <NRF_PSEL(SPIM_MISO, 0, 17)>;
+                low-power-enable;
+        };
+    };
 };
 

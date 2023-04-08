@@ -22,6 +22,10 @@
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/fs/nvs.h>
 
+#include <zephyr/drivers/gpio.h>                                                                                                                                                     
+#include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/i2c.h>
+
 /* Module name is used by the Application Event Manager macros in this file */
 #define MODULE main
 #include <caf/events/module_state_event.h>
@@ -482,6 +486,40 @@ void my_nvs_init()
 	}
 }
 
+const struct spi_cs_control spi_cs = {
+    .gpio = GPIO_DT_SPEC_GET(DT_NODELABEL(spi1), cs_gpios),
+    .delay = 0,
+};
+
+static struct spi_config spi_cfg = {
+    .frequency = 125000,
+    .operation = SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB | SPI_WORD_SET(8),
+    .slave = 0,
+    .cs =  &spi_cs,
+};
+
+static const struct device *spi_dev = DEVICE_DT_GET(DT_NODELABEL(spi1));
+
+void my_spi_init()
+{ 
+    if(!device_is_ready(spi_dev)){
+        LOG_ERR("spi device is not ready!");
+        return;
+    }
+}
+
+static const struct device *twi_dev = DEVICE_DT_GET(DT_NODELABEL(i2c2));
+
+#define I2C_ADDR 0x23
+
+void my_twi_init()
+{
+    if(!device_is_ready(twi_dev)){
+        LOG_ERR("twi device is not ready!");
+        return;
+    }
+}
+
 enum custom_cmd_t {
     FLASH_WRITE = 0x01,
     FLASH_READ = 0x02,
@@ -502,31 +540,33 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
     uint8_t len = command->ptr[1];
     uint8_t *data = command->ptr + 2;
 
-    switch(cmd){
-    case FLASH_WRITE:{
-        if (len == command->len - 2){
-            LOG_HEXDUMP_INF(data, len, "flash write: ");
-            int rc = nvs_write(&fs, NVS_CUSTOM_CLOUD_DATA_ID, data, len);
-            if (rc >= 0){
-                LOG_INF("write flash success!");
-            } else {
-                LOG_INF("write flash failed!, rc=%d", rc);
-            }
-        } else {
-            LOG_WRN("write flash len is not match! paylod_len=%d, len=%d", command->len, len);
-        }
-        
-        if(command->is_allocated){
-            k_free(command->ptr);
+    switch(cmd) {
+    case FLASH_WRITE:
+    case SPIM_WRITE:
+    case TWI_WRITE:
+        if (len != command->len - 2) {
+            LOG_WRN("write len is not match! paylod_len=%d, len=%d", command->len, len);
         }
         break;
+    }
+
+    switch(cmd) {
+    case FLASH_WRITE:{
+        LOG_HEXDUMP_INF(data, len, "flash write: ");
+        int rc = nvs_write(&fs, NVS_CUSTOM_CLOUD_DATA_ID, data, len);
+        if (rc >= 0){
+            LOG_INF("write flash success!");
+        } else {
+            LOG_INF("write flash failed!, rc=%d", rc);
+        }
+        goto free_ptr;
     }
     
     case FLASH_READ:{
         struct app_module_event *evt = new_app_module_event();
         if (evt == NULL) {
             LOG_ERR("Failed to allocate memory for event");
-            return;
+            goto free_ptr;
         }
 
         if( len <= 0 ) {
@@ -538,7 +578,7 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
             uint8_t *buf = k_malloc(len);
             if ( buf == NULL){
                 LOG_WRN("read flash malloc failed!");
-                return;
+                goto free_ptr;
             }
             int rc = nvs_read(&fs, NVS_CUSTOM_CLOUD_DATA_ID, buf, len);
             if (rc < 0) {
@@ -556,22 +596,129 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
         }
         evt->type = APP_EVT_CUSTOM_CLOUD_CMD_READY;
         APP_EVENT_SUBMIT(evt);
-        break;
+        goto free_ptr;
     }
     case SPIM_WRITE:{
-        break;
+        LOG_HEXDUMP_INF(data, len, "spim write: ");
+        // 直接把完整指令+数据发送到从机，由从机处理写入或读出
+        struct spi_buf spi_buffer = {
+            .buf = command->ptr,
+            .len = command->len,
+        };
+        struct spi_buf_set tx = {
+            .buffers = &spi_buffer,
+            .count = 1,
+        };
+        int rc = spi_write(spi_dev, &spi_cfg, &tx);
+        if (rc >= 0){
+            LOG_INF("write spi success!");
+        } else {
+            LOG_INF("write spi failed!, rc=%d", rc);
+        }
+        goto free_ptr;
     }
     case SPIM_READ:{
-        break;
+        struct app_module_event *evt = new_app_module_event();
+        if (evt == NULL) {
+            LOG_ERR("Failed to allocate memory for event");
+            goto free_ptr;
+        }
+        if( len <= 0 ) {
+            LOG_WRN("read spi len is less than 0!");
+            evt->data.custom_cmd.buf = NULL;
+            evt->data.custom_cmd.len = 0;
+            evt->data.custom_cmd.is_allocated = false;
+        } else {
+             // 直接把完整指令+数据发送到从机，由从机处理写入或读出
+            struct spi_buf spi_buffer = {
+                .buf = command->ptr,
+                .len = command->len,
+            };
+            struct spi_buf_set txrx = {
+                .buffers = &spi_buffer,
+                .count = 1,
+            };
+            spi_write(spi_dev, &spi_cfg, &txrx);
+            k_sleep(K_MSEC(1000));
+            
+            // 接收时也要携带指令部分，用于区分无数据和数据为0
+            int rc = spi_read(spi_dev, &spi_cfg, &txrx);
+            if ((rc < 0) || (((uint8_t*)spi_buffer.buf)[1] != len)) {
+                LOG_INF("read spi failed!, rc=%d, read_len=%d, required_len=%d", rc, ((uint8_t*)spi_buffer.buf)[1], len);
+                evt->data.custom_cmd.buf = NULL;
+                evt->data.custom_cmd.len = 0;
+                evt->data.custom_cmd.is_allocated = false;
+            } else {
+                LOG_HEXDUMP_INF(spi_buffer.buf, spi_buffer.len, "spi read success:");
+                evt->data.custom_cmd.buf = k_malloc(len);
+                if ( evt->data.custom_cmd.buf == NULL){
+                    LOG_WRN("read flash malloc failed!");
+                    goto free_ptr;
+                }
+                memcpy(evt->data.custom_cmd.buf, (uint8_t*)(spi_buffer.buf) + 2, len);
+                evt->data.custom_cmd.len = len;
+                evt->data.custom_cmd.is_allocated = true;
+            }
+            evt->type = APP_EVT_CUSTOM_CLOUD_CMD_READY;
+            APP_EVENT_SUBMIT(evt);
+            goto free_ptr; 
+        }
+        goto free_ptr; 
     }
     case TWI_WRITE:{
-        break;
+        LOG_HEXDUMP_INF(data, len, "twi write: ");
+        // 直接把完整指令+数据发送到从机，由从机处理写入或读出
+        int rc = i2c_write(twi_dev, data, len, I2C_ADDR);
+        if (rc >= 0){
+            LOG_INF("write spi success!");
+        } else {
+            LOG_INF("write spi failed!, rc=%d", rc);
+        }
+        goto free_ptr; 
     }
     case TWI_READ:{
-        break;
+        struct app_module_event *evt = new_app_module_event();
+        if (evt == NULL) {
+            LOG_ERR("Failed to allocate memory for event");
+            goto free_ptr;
+        }
+        if( len <= 0 ) {
+            LOG_WRN("read spi len is less than 0!");
+            evt->data.custom_cmd.buf = NULL;
+            evt->data.custom_cmd.len = 0;
+            evt->data.custom_cmd.is_allocated = false;
+        } else {
+            // i2c本身可区分读写，故直接读取数据
+            uint8_t* buf = k_malloc(len);
+            if ( buf == NULL){
+                LOG_WRN("read flash malloc failed!");
+                goto free_ptr;
+            }
+            int rc = i2c_read(twi_dev, buf, len, I2C_ADDR);
+            if (rc < 0) {
+                LOG_WRN("read twi failed!, rc=%d", rc);
+                k_free(buf);
+                evt->data.custom_cmd.buf = NULL;
+                evt->data.custom_cmd.len = 0;
+                evt->data.custom_cmd.is_allocated = false;
+            } else {
+                LOG_HEXDUMP_INF(buf, len, "twi read success:");
+                evt->data.custom_cmd.buf = buf;
+                evt->data.custom_cmd.len = len;
+                evt->data.custom_cmd.is_allocated = true;
+            }
+        }
+        evt->type = APP_EVT_CUSTOM_CLOUD_CMD_READY;
+        APP_EVENT_SUBMIT(evt); 
+        goto free_ptr; 
     }
     default:
         break;
+    }
+
+free_ptr:         
+    if(command->is_allocated){
+        k_free(command->ptr);
     }
 }
 
@@ -704,6 +851,8 @@ void main(void)
 	self.thread_id = k_current_get();
 
     my_nvs_init();
+    my_spi_init();
+    my_twi_init();
 
 	err = module_start(&self);
 	if (err) {
