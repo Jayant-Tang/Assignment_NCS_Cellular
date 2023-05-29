@@ -545,7 +545,7 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
     case SPIM_WRITE:
     case TWI_WRITE:
         if (len != command->len - 2) {
-            LOG_WRN("write len is not match! paylod_len=%d, len=%d", command->len, len);
+            LOG_WRN("write len is not match! paylod_len=%d, len=%d", command->len - 2, len);
         }
         break;
     }
@@ -642,9 +642,10 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
             k_sleep(K_MSEC(1000));
             
             // 接收时也要携带指令部分，用于区分无数据和数据为0
+            spi_buffer.len = len; // 读取数据长度
             int rc = spi_read(spi_dev, &spi_cfg, &txrx);
-            if ((rc < 0) || (((uint8_t*)spi_buffer.buf)[1] != len)) {
-                LOG_INF("read spi failed!, rc=%d, read_len=%d, required_len=%d", rc, ((uint8_t*)spi_buffer.buf)[1], len);
+            if ((rc < 0) ) {
+                LOG_INF("read spi failed!, rc=%d", rc);
                 evt->data.custom_cmd.buf = NULL;
                 evt->data.custom_cmd.len = 0;
                 evt->data.custom_cmd.is_allocated = false;
