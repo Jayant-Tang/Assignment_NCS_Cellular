@@ -510,7 +510,7 @@ void my_spi_init()
 
 static const struct device *twi_dev = DEVICE_DT_GET(DT_NODELABEL(i2c2));
 
-#define I2C_ADDR 0x23
+#define I2C_ADDR 0xbeef
 
 void my_twi_init()
 {
@@ -641,7 +641,6 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
             spi_write(spi_dev, &spi_cfg, &txrx);
             k_sleep(K_MSEC(1000));
             
-            // 接收时也要携带指令部分，用于区分无数据和数据为0
             spi_buffer.len = len; // 读取数据长度
             int rc = spi_read(spi_dev, &spi_cfg, &txrx);
             if ((rc < 0) ) {
@@ -656,7 +655,7 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
                     LOG_WRN("read flash malloc failed!");
                     goto free_ptr;
                 }
-                memcpy(evt->data.custom_cmd.buf, (uint8_t*)(spi_buffer.buf) + 2, len);
+                memcpy(evt->data.custom_cmd.buf, (uint8_t*)(spi_buffer.buf), len);
                 evt->data.custom_cmd.len = len;
                 evt->data.custom_cmd.is_allocated = true;
             }
@@ -668,12 +667,11 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
     }
     case TWI_WRITE:{
         LOG_HEXDUMP_INF(data, len, "twi write: ");
-        // 直接把完整指令+数据发送到从机，由从机处理写入或读出
         int rc = i2c_write(twi_dev, data, len, I2C_ADDR);
         if (rc >= 0){
-            LOG_INF("write spi success!");
+            LOG_INF("write i2c success!");
         } else {
-            LOG_INF("write spi failed!, rc=%d", rc);
+            LOG_INF("write i2c failed!, rc=%d", rc);
         }
         goto free_ptr; 
     }
@@ -684,12 +682,11 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
             goto free_ptr;
         }
         if( len <= 0 ) {
-            LOG_WRN("read spi len is less than 0!");
+            LOG_WRN("read i2c len is less than 0!");
             evt->data.custom_cmd.buf = NULL;
             evt->data.custom_cmd.len = 0;
             evt->data.custom_cmd.is_allocated = false;
         } else {
-            // i2c本身可区分读写，故直接读取数据
             uint8_t* buf = k_malloc(len);
             if ( buf == NULL){
                 LOG_WRN("read flash malloc failed!");
@@ -697,13 +694,13 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
             }
             int rc = i2c_read(twi_dev, buf, len, I2C_ADDR);
             if (rc < 0) {
-                LOG_WRN("read twi failed!, rc=%d", rc);
+                LOG_WRN("read i2c failed!, rc=%d", rc);
                 k_free(buf);
                 evt->data.custom_cmd.buf = NULL;
                 evt->data.custom_cmd.len = 0;
                 evt->data.custom_cmd.is_allocated = false;
             } else {
-                LOG_HEXDUMP_INF(buf, len, "twi read success:");
+                LOG_HEXDUMP_INF(buf, len, "i2c read success:");
                 evt->data.custom_cmd.buf = buf;
                 evt->data.custom_cmd.len = len;
                 evt->data.custom_cmd.is_allocated = true;
