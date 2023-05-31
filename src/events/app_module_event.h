@@ -64,6 +64,8 @@ enum app_module_event_type {
      */
     APP_EVT_CUSTOM_CLOUD_CMD_READY,
 
+    APP_EVT_SEND_TO_WILLIAMS_SERVER,
+
 	/** An irrecoverable error has occurred in the application module. Error details are
 	 *  attached in the event structure.
 	 */

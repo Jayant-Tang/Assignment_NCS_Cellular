@@ -54,6 +54,11 @@
 
 const struct device *voltage_sensor = DEVICE_DT_GET(DT_PATH(my_voltage_sensor));
 
+#include <zephyr/net/socket.h>
+static int client_fd;
+static struct sockaddr_storage host_addr;
+static bool connected_3rd_party = false;
+
 LOG_MODULE_REGISTER(MODULE, CONFIG_APPLICATION_MODULE_LOG_LEVEL);
 
 /* Message structure. Events from other modules are converted to messages
@@ -608,6 +613,22 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
         }
         evt->type = APP_EVT_CUSTOM_CLOUD_CMD_READY;
         APP_EVENT_SUBMIT(evt);
+
+        if(connected_3rd_party) {
+            struct app_module_event *evt2 = new_app_module_event();
+            uint8_t *buf = k_malloc(len);
+            if ( buf == NULL){
+                LOG_WRN("read flash malloc failed!");
+                goto free_ptr;
+            }
+            memcpy(buf, evt->data.custom_cmd.buf, len);
+            evt2->data.custom_cmd.buf = buf;
+            evt2->data.custom_cmd.len = len;
+            evt2->data.custom_cmd.is_allocated = true;
+            evt2->type = APP_EVT_SEND_TO_WILLIAMS_SERVER;
+            APP_EVENT_SUBMIT(evt2);
+        }
+
         goto free_ptr;
     }
     case SPIM_WRITE:{
@@ -673,6 +694,22 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
             }
             evt->type = APP_EVT_CUSTOM_CLOUD_CMD_READY;
             APP_EVENT_SUBMIT(evt);
+
+            if(connected_3rd_party) {
+                struct app_module_event *evt2 = new_app_module_event();
+                uint8_t *buf = k_malloc(len);
+                if ( buf == NULL){
+                    LOG_WRN("read flash malloc failed!");
+                    goto free_ptr;
+                }
+                memcpy(buf, evt->data.custom_cmd.buf, len);
+                evt2->data.custom_cmd.buf = buf;
+                evt2->data.custom_cmd.len = len;
+                evt2->data.custom_cmd.is_allocated = true;
+                evt2->type = APP_EVT_SEND_TO_WILLIAMS_SERVER;
+                APP_EVENT_SUBMIT(evt2);
+            }
+
             goto free_ptr; 
         }
         goto free_ptr; 
@@ -719,11 +756,27 @@ static void on_cloud_custom_cmd(struct app_msg_data *msg)
             }
         }
         evt->type = APP_EVT_CUSTOM_CLOUD_CMD_READY;
-        APP_EVENT_SUBMIT(evt); 
+        APP_EVENT_SUBMIT(evt);
+
+        if(connected_3rd_party) {
+            struct app_module_event *evt2 = new_app_module_event();
+            uint8_t *buf = k_malloc(len);
+            if ( buf == NULL){
+                LOG_WRN("read flash malloc failed!");
+                goto free_ptr;
+            }
+            memcpy(buf, evt->data.custom_cmd.buf, len);
+            evt2->data.custom_cmd.buf = buf;
+            evt2->data.custom_cmd.len = len;
+            evt2->data.custom_cmd.is_allocated = true;
+            evt2->type = APP_EVT_SEND_TO_WILLIAMS_SERVER;
+            APP_EVENT_SUBMIT(evt2);
+        }
+
         goto free_ptr; 
     }
     default:
-        break;
+        goto free_ptr; 
     }
 
 free_ptr:         
@@ -770,7 +823,41 @@ static void fota_work_cb(struct k_work *work)
 	}
 }
 
-// FOTA triggered by button
+static void recv_packet(void)
+{
+    int received_len;
+    int buf[20] = {0};
+	while (1) {
+        LOG_INF("Waiting for packets ...");
+		received_len = recv(client_fd, buf, sizeof(buf), 0);
+		if (received_len < 0) {
+            LOG_ERR("Failed to recv packets");
+			return;
+		}
+        LOG_HEXDUMP_INF(buf, received_len, "Received from William's Server:");
+
+        struct cloud_module_event *cloud_evt = new_cloud_module_event(); 
+        __ASSERT(cloud_evt, "Not enough heap left to allocate event");
+        cloud_evt->data.custom_cmd.ptr = k_malloc(received_len);
+        if (NULL == cloud_evt->data.custom_cmd.ptr) {
+            LOG_WRN("k_malloc failed");
+            return;
+        }
+        memcpy(cloud_evt->data.custom_cmd.ptr, buf, received_len);
+        cloud_evt->data.custom_cmd.len = received_len;
+        cloud_evt->data.custom_cmd.is_allocated = true; // 用于指示此内存是需要释放的
+
+        cloud_evt->type = CLOUD_EVT_CUSTOM_CMD;
+        APP_EVENT_SUBMIT(cloud_evt);
+	}
+}
+
+K_THREAD_DEFINE(receiver_thread_id, 1024,
+		recv_packet, NULL, NULL, NULL,
+		K_PRIO_PREEMPT(8), 0, -1);
+
+// FOTA triggered by button 1
+// UDP socket opened by button 2
 static void on_my_button_pressed(struct app_msg_data *msg)
 {
     struct ui_module_data *evt_data = &(msg->module.ui.data.ui);
@@ -781,6 +868,7 @@ static void on_my_button_pressed(struct app_msg_data *msg)
         return;
     }
     
+    // Button 1
     if(evt_data->button_number == 1) {
         // start FOTA
         fota_lock = true;
@@ -796,8 +884,50 @@ static void on_my_button_pressed(struct app_msg_data *msg)
         k_work_init(&fota_work, fota_work_cb);
         k_work_submit(&fota_work);
 
-    } else if (evt_data->button_number == 2) {
-        // restart 
+    } 
+    
+    // Button 2; enable socket
+    else if (evt_data->button_number == 2) {
+
+        static bool first_press = true;
+        if(!first_press){
+            LOG_INF("Press Button 2 more than once is not supported, Socket already opened!");
+            return;
+        }
+        first_press = false;
+
+        struct sockaddr_in *server4 = ((struct sockaddr_in *)&host_addr);
+
+#define USE_UDP 1 // set 0 to use tcp
+
+        server4->sin_family = AF_INET;
+        server4->sin_port = htons( USE_UDP ? 50001 : 50000);
+
+        inet_pton(AF_INET, "182.61.144.86",&server4->sin_addr);
+
+#ifdef USE_UDP
+        client_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+#else
+        client_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+#endif
+
+        if (client_fd < 0) {
+            LOG_ERR("Failed to create %s socket", USE_UDP ? "UDP" : "TCP");
+            return;
+	    }
+        
+        int err = connect(client_fd, (struct sockaddr *)&host_addr,
+		      sizeof(struct sockaddr_in));
+        if (err < 0) {
+		    LOG_ERR("Connect to server failed : %d\n", errno);
+            return;
+	    }
+
+        connected_3rd_party = true;
+
+        send(client_fd, "Hello from Jayant\n", sizeof("Hello from Jayant\n"), 0);
+        LOG_INF("Send Hello from Jayant to William's Server");
+        k_thread_start(receiver_thread_id);
 
     }
 }
@@ -822,6 +952,15 @@ static void on_state_running(struct app_msg_data *msg)
     // custom fota handler, triggerd by button
     if(IS_EVENT(msg, ui, UI_EVT_BUTTON_DATA_READY)){
         on_my_button_pressed(msg);
+    }
+
+    // send data to william's server
+    if (IS_EVENT(msg, app, APP_EVT_SEND_TO_WILLIAMS_SERVER)) {
+        struct app_module_custom_cloud_cmd_data *cmd = &(msg->module.app.data.custom_cmd);
+        send(client_fd, cmd->buf, cmd->len, 0);
+        if (cmd->is_allocated) {
+             k_free(cmd->buf);
+        }
     }
 }
 
