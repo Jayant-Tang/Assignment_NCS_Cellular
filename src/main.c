@@ -38,6 +38,9 @@
 #include "events/util_module_event.h"
 #include "events/modem_module_event.h"
 
+// added by jayant
+#include "events/ui_module_event.h"
+
 #include <zephyr/logging/log.h>
 #include <zephyr/logging/log_ctrl.h>
 
@@ -65,6 +68,7 @@ struct app_msg_data {
 		struct util_module_event util;
 		struct modem_module_event modem;
 		struct app_module_event app;
+        struct ui_module_event ui; // added by jayant
 	} module;
 };
 
@@ -300,6 +304,14 @@ static bool app_event_handler(const struct app_event_header *aeh)
 		struct modem_module_event *evt = cast_modem_module_event(aeh);
 
 		msg.module.modem = *evt;
+		enqueue_msg = true;
+	}
+
+    // added by jayant
+    if (is_ui_module_event(aeh)) {
+		struct ui_module_event *evt = cast_ui_module_event(aeh);
+
+		msg.module.ui = *evt;
 		enqueue_msg = true;
 	}
 
@@ -720,6 +732,76 @@ free_ptr:
     }
 }
 
+// added by jayant
+#include <zephyr/dfu/mcuboot.h>
+#include <dfu/dfu_target_mcuboot.h>
+#include <net/fota_download.h>
+
+static struct k_work fota_work;
+static bool fota_lock = false;
+
+#define SEG_TAG -1
+
+static void fota_dl_handler(const struct fota_download_evt *evt)
+{
+	switch (evt->id) {
+	case FOTA_DOWNLOAD_EVT_ERROR:
+		LOG_ERR("Received error from fota_download\n");
+		fota_lock = false;
+		break;
+
+	case FOTA_DOWNLOAD_EVT_FINISHED:
+		LOG_INF("Press 'Reset' button to apply new firmware\n");
+        fota_lock = false;
+		break;
+
+	default:
+		break;
+	}
+}
+
+static void fota_work_cb(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	int err = fota_download_start("182.61.144.86:50002", "app_update_jayant.bin", SEG_TAG, 0, 0);
+	if (err != 0) {
+		LOG_ERR("fota_download_start() failed, err %d\n", err);
+	}
+}
+
+// FOTA triggered by button
+static void on_my_button_pressed(struct app_msg_data *msg)
+{
+    struct ui_module_data *evt_data = &(msg->module.ui.data.ui);
+    
+    // refuse button event when already in FOTA progress
+    if (fota_lock) {
+        LOG_INF("FOTA is in progress, please wait!");
+        return;
+    }
+    
+    if(evt_data->button_number == 1) {
+        // start FOTA
+        fota_lock = true;
+        int err = fota_download_init(fota_dl_handler);
+        if (err != 0) {
+            LOG_ERR("fota_download_init() failed, err %d\n", err);
+            fota_lock = false;
+            return;
+        }
+        
+        // add a new thread to start fota,
+        // prevent blocking the main thread
+        k_work_init(&fota_work, fota_work_cb);
+        k_work_submit(&fota_work);
+
+    } else if (evt_data->button_number == 2) {
+        // restart 
+
+    }
+}
+
 
 /* Message handler for STATE_RUNNING. */
 static void on_state_running(struct app_msg_data *msg)
@@ -732,8 +814,14 @@ static void on_state_running(struct app_msg_data *msg)
 		data_get();
 	}
 
+    // custom mqtt cmd handler
     if(IS_EVENT(msg, cloud, CLOUD_EVT_CUSTOM_CMD)) {
         on_cloud_custom_cmd(msg);
+    }
+
+    // custom fota handler, triggerd by button
+    if(IS_EVENT(msg, ui, UI_EVT_BUTTON_DATA_READY)){
+        on_my_button_pressed(msg);
     }
 }
 
@@ -897,5 +985,6 @@ APP_EVENT_SUBSCRIBE_EARLY(MODULE, cloud_module_event);
 APP_EVENT_SUBSCRIBE(MODULE, app_module_event);
 APP_EVENT_SUBSCRIBE(MODULE, data_module_event);
 APP_EVENT_SUBSCRIBE(MODULE, util_module_event);
+APP_EVENT_SUBSCRIBE(MODULE, ui_module_event);
 APP_EVENT_SUBSCRIBE_FINAL(MODULE, sensor_module_event);
 APP_EVENT_SUBSCRIBE_FINAL(MODULE, modem_module_event);
