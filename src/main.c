@@ -44,6 +44,8 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/logging/log_ctrl.h>
 
+#include <zephyr/pm/device.h>
+
 #include "voltage-sensor.h"
 
 // 判断电压表device tree node是否存在
@@ -523,6 +525,9 @@ void my_spi_init()
         LOG_ERR("spi device is not ready!");
         return;
     }
+    enum pm_device_state state;
+    pm_device_state_get(spi_dev, &state);
+    LOG_INF("spi_dev pm status:%s", pm_device_state_str(state));
 }
 
 static const struct device *twi_dev = DEVICE_DT_GET(DT_NODELABEL(i2c2));
@@ -535,6 +540,9 @@ void my_twi_init()
         LOG_ERR("twi device is not ready!");
         return;
     }
+    enum pm_device_state state;
+    pm_device_state_get(twi_dev, &state);
+    LOG_INF("spi_dev pm status:%s", pm_device_state_str(state));    
 }
 
 enum custom_cmd_t {

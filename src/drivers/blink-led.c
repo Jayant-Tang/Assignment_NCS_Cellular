@@ -15,6 +15,8 @@
 #include <nrfx_ppi.h>
 #endif
 
+#include <zephyr/pm/device.h>
+
 #include <nrfx_gpiote.h>
 
 #include <zephyr/logging/log.h>
@@ -200,6 +202,30 @@ static int blink_stop(const struct device *dev, uint32_t idx)
     return 0;
 }
 
+// power saving when CPU idle
+#ifdef CONFIG_PM_DEVICE
+static int jayant_blink_led_pm_action(const struct device *dev, enum pm_device_action action)
+{
+    int ret = 0;
+    switch (action) {
+    case PM_DEVICE_ACTION_RESUME:
+        ret = blink_start_all(dev);
+        LOG_INF("blink resume");
+        break;
+    case PM_DEVICE_ACTION_SUSPEND:
+        ret = blink_stop_all(dev);
+        LOG_INF("blink suspend");
+        break;
+    default:
+        LOG_ERR("unexpected action: %d",action);
+    }
+        
+    return ret;
+}
+
+#endif // CONFIG_PM_DEVICE
+
+
 static const struct blink_led_api blink_api= {
     .start_all = blink_start_all,
     .stop_all = blink_stop_all,
@@ -233,7 +259,8 @@ static const struct blink_led_config blink_led_config_##i = {                   
                 DT_REG_ADDR(DT_PHANDLE_BY_IDX(DT_DRV_INST(i), timer,0)),        \
 };                                                                              \
                                                                                 \
-DEVICE_DT_INST_DEFINE(i, &blink_led_init, NULL,			                        \
+PM_DEVICE_DT_INST_DEFINE(i,jayant_blink_led_pm_action);		                    \
+DEVICE_DT_INST_DEFINE(i, &blink_led_init, PM_DEVICE_DT_INST_GET(i),		        \
 		      NULL, &blink_led_config_##i,		                                \
 		      POST_KERNEL, CONFIG_JAYANT_BLINK_LED_PRIORITY,	                \
 		      &blink_api);                               

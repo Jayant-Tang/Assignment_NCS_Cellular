@@ -82,6 +82,29 @@
     status = "okay";
 };
 
+&timer1 {
+    status = "disabled";
+};
+
+&timer2 {
+    status = "disabled";
+};
+
+&wdt {
+    status = "disabled";
+};
+
+&uart0 {
+    status = "disabled";
+};
+
+&rtc1 {
+    status = "disabled";
+};
+
+
+
+
 &adc {
 	#address-cells = <1>;
 	#size-cells = <0>;

@@ -23,6 +23,8 @@
 #include "events/util_module_event.h"
 #include "events/cloud_module_event.h"
 
+#include <zephyr/pm/device.h>
+
 #ifdef CONFIG_LWM2M_CARRIER
 #include <lwm2m_carrier.h>
 #endif /* CONFIG_LWM2M_CARRIER */
@@ -254,6 +256,36 @@ static void lte_evt_handler(const struct lte_lc_evt *const evt)
 					"Reference Guide v2.0 - chpt. 5.36");
 		}
 		break;
+    case LTE_LC_EVT_MODEM_SLEEP_ENTER: {
+        LOG_INF("Modem sleep");
+        
+        const struct device *jayant_blink_led = DEVICE_DT_GET(DT_PATH(blink_leds));
+        pm_device_action_run(jayant_blink_led, PM_DEVICE_ACTION_SUSPEND);
+        
+        const struct device *spi_dev = DEVICE_DT_GET(DT_NODELABEL(spi1));
+        pm_device_action_run(spi_dev, PM_DEVICE_ACTION_SUSPEND);
+        
+        const struct device *i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c2));
+        pm_device_action_run(i2c_dev, PM_DEVICE_ACTION_SUSPEND);
+
+        break;
+    }
+        
+    case LTE_LC_EVT_MODEM_SLEEP_EXIT:
+        LOG_INF("Modem wakeup");
+        const struct device *jayant_blink_led = DEVICE_DT_GET(DT_PATH(blink_leds));
+        pm_device_action_run(jayant_blink_led, PM_DEVICE_ACTION_RESUME);
+
+        const struct device *spi_dev = DEVICE_DT_GET(DT_NODELABEL(spi1));
+        pm_device_action_run(spi_dev, PM_DEVICE_ACTION_RESUME);
+
+        const struct device *i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c2));
+        pm_device_action_run(i2c_dev, PM_DEVICE_ACTION_RESUME);
+
+        break;  
+    case LTE_LC_EVT_MODEM_SLEEP_EXIT_PRE_WARNING:
+        LOG_INF("Modem wakeup pre warning");
+        break;
 	default:
 		break;
 	}
